@@ -2,12 +2,14 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Spendly</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- HTML2PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <!-- Google Fonts: Unbounded -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,28 +20,35 @@
             --bg-dark: #050505;
             --bg-panel: rgba(255, 255, 255, 0.03);
             --border-panel: rgba(255, 255, 255, 0.05);
-            --accent-purple: #a855f7;
-            --accent-cyan: #2dd4bf;
+            --accent-1: #a855f7; /* Purple by default */
+            --accent-2: #2dd4bf; /* Teal by default */
         }
+        
+        /* Themes */
+        .theme-pink { --accent-1: #ec4899; --accent-2: #fbcfe8; }
+        .theme-orange { --accent-1: #f97316; --accent-2: #fde047; }
+        .theme-blue { --accent-1: #3b82f6; --accent-2: #60a5fa; }
+
         body {
             font-family: 'Unbounded', sans-serif;
             background-color: var(--bg-dark);
             color: #ffffff;
-            background-image: radial-gradient(circle at 50% 0%, #1a0b2e 0%, #050505 60%);
+            background-image: radial-gradient(circle at 50% 0%, rgba(26, 11, 46, 0.5) 0%, #050505 60%);
             background-attachment: fixed;
             -webkit-tap-highlight-color: transparent;
         }
         .text-gradient {
-            background: linear-gradient(90deg, var(--accent-purple), var(--accent-cyan));
+            background: linear-gradient(90deg, var(--accent-1), var(--accent-2));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
         .bg-gradient-btn {
-            background: linear-gradient(90deg, #8b5cf6, #14b8a6);
-            transition: opacity 0.2s;
+            background: linear-gradient(90deg, var(--accent-1), var(--accent-2));
+            transition: opacity 0.2s, transform 0.1s;
         }
         .bg-gradient-btn:active {
             opacity: 0.8;
+            transform: scale(0.98);
         }
         .glass-panel {
             background: var(--bg-panel);
@@ -60,17 +69,16 @@
             font-family: 'Unbounded', sans-serif;
         }
         .input-field:focus {
-            border-color: var(--accent-purple);
+            border-color: var(--accent-1);
         }
         .input-field option, .input-field optgroup {
             background: #111;
             color: white;
-            font-family: sans-serif; /* Unbounded can be glitchy in native selects */
+            font-family: sans-serif;
         }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         
-        /* Progress Bar */
         .progress-container {
             width: 100%;
             background-color: rgba(255,255,255,0.1);
@@ -88,112 +96,167 @@
         /* Animations */
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        @keyframes pop { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
         .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .animate-pop { animation: pop 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        
+        /* PIN Pad */
+        .pin-btn {
+            width: 70px; height: 70px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.05);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem; font-weight: bold;
+            transition: background 0.2s;
+        }
+        .pin-btn:active { background: rgba(255,255,255,0.2); }
+        .pin-dot { width: 12px; height: 12px; border-radius: 50%; background: rgba(255,255,255,0.2); transition: background 0.2s; }
+        .pin-dot.filled { background: var(--accent-1); box-shadow: 0 0 10px var(--accent-1); }
+
+        /* Toast */
+        #toast {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-100%);
+            background: var(--accent-1); color: white; padding: 10px 20px; border-radius: 20px;
+            font-size: 0.875rem; font-weight: bold; z-index: 9999; opacity: 0; transition: all 0.3s;
+        }
+        #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
     </style>
 </head>
 <body class="antialiased h-screen overflow-hidden flex flex-col items-center justify-center">
 
+<div id="toast">Уведомление</div>
+
 <div id="app-container" class="relative w-full max-w-md h-full sm:h-[90vh] sm:rounded-[2rem] sm:border border-gray-800 bg-[#050505] overflow-hidden shadow-2xl flex flex-col">
     
     <!-- 1. Splash Screen -->
-    <div id="screen-splash" class="app-screen absolute inset-0 z-10 flex flex-col items-center justify-center p-6 bg-[#050505]">
-        <img src="images/logo_spedly_png.png" alt="Spendly Logo" class="h-24 mb-6 object-contain" onerror="this.outerHTML='<div class=\'w-24 h-24 bg-gradient-btn rounded-3xl flex items-center justify-center mb-6 shadow-lg shadow-purple-500/30\'><span class=\'text-5xl font-bold text-white\'>S</span></div>'">
-        <h1 class="text-2xl font-bold mb-10 text-center tracking-tight">Добро пожаловать в Spendly!</h1>
-        <button onclick="navigate('screen-login')" class="bg-gradient-btn px-8 py-4 rounded-2xl font-semibold w-full text-lg shadow-lg shadow-teal-500/20">Продолжить</button>
+    <div id="screen-splash" class="app-screen absolute inset-0 z-50 flex flex-col items-center justify-center p-6 bg-[#050505]">
+        <div class="w-24 h-24 bg-gradient-btn rounded-3xl flex items-center justify-center mb-6 shadow-lg shadow-purple-500/30 animate-pop">
+            <span class="text-5xl font-bold text-white">S</span>
+        </div>
+        <h1 class="text-2xl font-bold mb-10 text-center tracking-tight animate-fade-in">Добро пожаловать в Spendly!</h1>
+        <button onclick="checkAuthAndPin()" class="bg-gradient-btn px-8 py-4 rounded-2xl font-semibold w-full text-lg shadow-lg shadow-teal-500/20">Быстрый старт 🚀</button>
+    </div>
+
+    <!-- 1.5. PIN Screen -->
+    <div id="screen-pin" class="app-screen hidden absolute inset-0 z-40 flex flex-col items-center justify-center p-6 bg-[#050505]">
+        <h2 class="text-2xl font-bold mb-8">Введите PIN-код 🔐</h2>
+        <div class="flex gap-4 mb-10" id="pin-dots">
+            <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+        </div>
+        <div class="grid grid-cols-3 gap-6">
+            <button class="pin-btn" onclick="enterPin(1)">1</button>
+            <button class="pin-btn" onclick="enterPin(2)">2</button>
+            <button class="pin-btn" onclick="enterPin(3)">3</button>
+            <button class="pin-btn" onclick="enterPin(4)">4</button>
+            <button class="pin-btn" onclick="enterPin(5)">5</button>
+            <button class="pin-btn" onclick="enterPin(6)">6</button>
+            <button class="pin-btn" onclick="enterPin(7)">7</button>
+            <button class="pin-btn" onclick="enterPin(8)">8</button>
+            <button class="pin-btn" onclick="enterPin(9)">9</button>
+            <div></div>
+            <button class="pin-btn" onclick="enterPin(0)">0</button>
+            <button class="pin-btn bg-red-500/10 text-red-400" onclick="clearPin()">C</button>
+        </div>
+        <button onclick="executeLogout()" class="mt-12 text-sm text-gray-500 underline">Выйти из аккаунта</button>
     </div>
 
     <!-- 2. Login Screen -->
-    <div id="screen-login" class="app-screen hidden absolute inset-0 z-10 flex flex-col items-center justify-center p-6 bg-[#050505] overflow-y-auto no-scrollbar">
-        <img src="images/vhod.png" alt="Вход" class="h-16 mb-6 object-contain" onerror="this.style.display='none'">
+    <div id="screen-login" class="app-screen hidden absolute inset-0 z-30 flex flex-col items-center justify-center p-6 bg-[#050505] overflow-y-auto no-scrollbar">
         <div class="w-16 h-16 bg-gradient-btn rounded-2xl flex items-center justify-center mb-6 shadow-lg">
             <span class="text-3xl font-bold">S</span>
         </div>
         <h2 class="text-2xl font-bold mb-8 tracking-tight">Вход / Регистрация</h2>
-        
         <form class="w-full space-y-4" onsubmit="event.preventDefault();">
             <input type="text" id="auth-email" placeholder="Почта или телефон" class="input-field" required>
             <input type="text" id="auth-name" placeholder="Имя (для регистрации, мин 3 симв.)" class="input-field min-length-3">
             <input type="password" id="auth-password" placeholder="Пароль" class="input-field" required minlength="6">
-            
             <div class="flex gap-3 pt-4">
                 <button type="button" onclick="handleAuth('login')" class="flex-1 bg-gradient-btn py-4 rounded-2xl font-semibold shadow-lg shadow-purple-500/20">Войти</button>
-                <button type="button" onclick="handleAuth('register')" class="flex-1 border border-teal-500 text-teal-400 py-4 rounded-2xl font-semibold">Регистрация</button>
+                <button type="button" onclick="handleAuth('register')" class="flex-1 border border-teal-500 text-teal-400 py-4 rounded-2xl font-semibold">Рег.</button>
             </div>
-            
             <button type="button" onclick="navigate('screen-guest-warning')" class="w-full bg-[#1a1a1a] text-gray-400 py-4 rounded-2xl mt-4 font-semibold hover:text-white transition-colors">Войти как гость</button>
         </form>
     </div>
 
     <!-- 3. Guest Warning Screen -->
-    <div id="screen-guest-warning" class="app-screen hidden absolute inset-0 z-10 flex flex-col items-center justify-center p-6 bg-[#050505] text-center">
-        <img src="images/vnimanie.png" alt="Внимание" class="h-24 mb-6 object-contain" onerror="this.outerHTML='<div class=\'text-yellow-500 mb-6\'><svg class=\'w-24 h-24 mx-auto\' fill=\'none\' stroke=\'currentColor\' viewBox=\'0 0 24 24\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z\'></path></svg></div>'">
+    <div id="screen-guest-warning" class="app-screen hidden absolute inset-0 z-30 flex flex-col items-center justify-center p-6 bg-[#050505] text-center">
+        <div class='text-yellow-500 mb-6'><svg class='w-24 h-24 mx-auto' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z'></path></svg></div>
         <h2 class="text-2xl font-bold mb-4 text-gradient">Внимание!</h2>
-        <p class="mb-10 text-gray-400 leading-relaxed text-sm">Если вы не войдёте в аккаунт, то дальше вы не сможете перенести траты на другой девайс.</p>
+        <p class="mb-10 text-gray-400 leading-relaxed text-sm">Без аккаунта данные хранятся только на этом устройстве. Вы не сможете перенести их, но зато это 100% приватно!</p>
         <div class="flex flex-col gap-3 w-full">
             <button onclick="loginGuest()" class="w-full bg-gradient-btn py-4 rounded-2xl font-semibold text-lg shadow-lg">Соглашаюсь</button>
             <button onclick="navigate('screen-login')" class="w-full bg-[#1a1a1a] py-4 rounded-2xl font-semibold text-gray-300">Отмена</button>
         </div>
     </div>
 
-    <!-- 4. Main Application Interface -->
+    <!-- 4. Main Interface -->
     <div id="screen-main" class="app-screen hidden flex-1 flex flex-col h-full w-full relative">
-        <!-- Main Header -->
-        <header class="p-5 flex justify-between items-center z-10">
+        
+        <!-- Header -->
+        <header class="p-5 flex justify-between items-center z-10 bg-gradient-to-b from-[#050505] to-transparent">
             <div>
-                <h2 id="user-greeting" class="text-xl font-bold">Привет, Гость!</h2>
-                <p class="text-xs text-gray-400 mt-1">Spendly Tracker</p>
+                <h2 id="user-greeting" class="text-xl font-bold">Привет, Транжира! 👋</h2>
+                <p class="text-xs text-gray-400 mt-1">Твой личный бюджет</p>
             </div>
-            <div class="w-10 h-10 rounded-full bg-gradient-btn flex items-center justify-center font-bold text-lg shadow-lg" id="user-avatar-letter">Г</div>
+            <div class="flex items-center gap-3">
+                <button onclick="showToast('Нет новых напоминаний')" class="relative text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                </button>
+                <div class="w-10 h-10 rounded-full bg-gradient-btn flex items-center justify-center font-bold text-lg shadow-lg cursor-pointer" onclick="switchView('view-settings')" id="user-avatar-letter">Г</div>
+            </div>
         </header>
 
-        <!-- Viewport Container -->
-        <main class="flex-1 overflow-y-auto px-4 pb-24 no-scrollbar relative z-0">
+        <!-- Viewport -->
+        <main class="flex-1 overflow-y-auto px-4 pb-24 no-scrollbar relative z-0" id="main-scroll-area">
             
             <!-- VIEW: HOME -->
             <div id="view-home" class="app-view space-y-6 animate-fade-in">
+                <!-- Main Widget -->
                 <div class="glass-panel p-6 flex flex-col items-center relative overflow-hidden">
-                    <!-- decorative blur -->
-                    <div class="absolute -top-10 -right-10 w-32 h-32 bg-purple-600 rounded-full blur-[3rem] opacity-20"></div>
-                    <div class="absolute -bottom-10 -left-10 w-32 h-32 bg-teal-600 rounded-full blur-[3rem] opacity-20"></div>
+                    <div class="absolute -top-10 -right-10 w-32 h-32 bg-[var(--accent-1)] rounded-full blur-[3rem] opacity-20"></div>
+                    <div class="absolute -bottom-10 -left-10 w-32 h-32 bg-[var(--accent-2)] rounded-full blur-[3rem] opacity-20"></div>
                     
-                    <h3 class="text-sm text-gray-400 mb-1 z-10">Общие траты</h3>
-                    <div class="text-3xl font-bold mb-6 z-10 tracking-tight" id="home-total-expenses">0 ₽</div>
+                    <h3 class="text-sm text-gray-400 mb-1 z-10">Траты в этом месяце</h3>
+                    <div class="text-3xl font-bold mb-1 z-10 tracking-tight" id="home-total-expenses">0 ₽</div>
                     
-                    <div class="w-48 h-48 relative z-10 mb-2">
+                    <!-- Budgets Mini-widget -->
+                    <div class="w-full mt-2 z-10 bg-black/30 rounded-xl p-3 flex justify-between items-center cursor-pointer" onclick="switchView('view-finance')">
+                        <div class="text-xs text-gray-400">Лимит: <span id="home-budget-limit" class="text-white">Не задан</span></div>
+                        <div class="text-xs" id="home-budget-status">--</div>
+                    </div>
+
+                    <div class="w-48 h-48 relative z-10 mt-4 mb-2">
                         <canvas id="home-chart"></canvas>
                     </div>
                 </div>
                 
-                <button onclick="openModal('modal-add-expense')" class="bg-gradient-btn w-full py-4 rounded-2xl font-semibold flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20 text-lg">
+                <button onclick="openModal('modal-add-expense')" class="bg-gradient-btn w-full py-4 rounded-2xl font-semibold flex items-center justify-center gap-2 shadow-lg text-lg">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                     Добавить трату
                 </button>
 
                 <div>
                     <div class="flex justify-between items-end mb-4">
-                        <h3 class="font-bold text-lg">Недавние траты</h3>
-                        <button onclick="switchView('view-stats')" class="text-xs text-teal-400">Все</button>
+                        <h3 class="font-bold text-lg">Недавние операции</h3>
+                        <button onclick="switchView('view-stats')" class="text-xs text-[var(--accent-2)]">Все</button>
                     </div>
-                    <div id="home-recent-list" class="space-y-3">
-                        <!-- populated by JS -->
-                        <div class="text-center text-gray-500 text-sm py-4">Нет данных</div>
-                    </div>
+                    <div id="home-recent-list" class="space-y-3"></div>
                 </div>
             </div>
 
             <!-- VIEW: INCOMES -->
             <div id="view-incomes" class="app-view hidden space-y-6 animate-fade-in">
-                <div class="glass-panel p-6 text-center">
-                    <h3 class="text-sm text-gray-400 mb-1">Остаток средств</h3>
+                <div class="glass-panel p-6 text-center relative overflow-hidden">
+                    <h3 class="text-sm text-gray-400 mb-1">Свободные средства</h3>
                     <div class="text-4xl font-bold text-gradient mb-4" id="incomes-balance">0 ₽</div>
                     <div class="flex justify-between text-sm mt-4 bg-black/30 p-3 rounded-xl">
                         <div class="flex flex-col items-center w-1/2 border-r border-gray-700">
-                            <span class="text-gray-400 text-xs mb-1">Доходы</span>
+                            <span class="text-gray-400 text-xs mb-1">Доходы (Всего)</span>
                             <span class="text-green-400 font-bold" id="incomes-total-in">0 ₽</span>
                         </div>
                         <div class="flex flex-col items-center w-1/2">
-                            <span class="text-gray-400 text-xs mb-1">Траты</span>
+                            <span class="text-gray-400 text-xs mb-1">Траты (Всего)</span>
                             <span class="text-red-400 font-bold" id="incomes-total-out">0 ₽</span>
                         </div>
                     </div>
@@ -201,7 +264,7 @@
                 
                 <button onclick="openModal('modal-add-income')" class="bg-gradient-btn w-full py-4 rounded-2xl font-semibold flex items-center justify-center gap-2 shadow-lg">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                    Добавить доход
+                    Пополнить баланс
                 </button>
 
                 <div>
@@ -210,72 +273,146 @@
                 </div>
             </div>
 
-            <!-- VIEW: STATS -->
-            <div id="view-stats" class="app-view hidden space-y-6 animate-fade-in">
-                <h2 class="text-2xl font-bold">Общие траты</h2>
-                <div class="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-                    <button class="px-5 py-2 rounded-xl glass-panel text-sm font-semibold bg-white/10 text-white border-teal-500">Все</button>
-                    <button class="px-5 py-2 rounded-xl glass-panel text-sm text-gray-400">Неделя</button>
-                    <button class="px-5 py-2 rounded-xl glass-panel text-sm text-gray-400">Месяц</button>
-                    <input type="date" class="px-3 py-2 rounded-xl glass-panel text-sm bg-transparent outline-none text-gray-400">
+            <!-- VIEW: STATS & SEARCH -->
+            <div id="view-stats" class="app-view hidden space-y-4 animate-fade-in">
+                <h2 class="text-2xl font-bold mb-2">Аналитика 📊</h2>
+                
+                <!-- Search & Filters -->
+                <div class="flex flex-col gap-3">
+                    <div class="relative">
+                        <svg class="w-5 h-5 absolute left-3 top-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        <input type="text" id="search-tx" oninput="renderStats()" placeholder="Куда ушли деньги? (напр. Шаурма)" class="input-field pl-10 bg-black/40">
+                    </div>
+                    
+                    <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                        <button onclick="setStatFilter('all')" id="flt-all" class="stat-filter-btn px-4 py-2 rounded-xl glass-panel text-xs font-semibold bg-white/10 text-white border-[var(--accent-2)] border">Все</button>
+                        <button onclick="setStatFilter('day')" id="flt-day" class="stat-filter-btn px-4 py-2 rounded-xl glass-panel text-xs text-gray-400 border-transparent border">День</button>
+                        <button onclick="setStatFilter('week')" id="flt-week" class="stat-filter-btn px-4 py-2 rounded-xl glass-panel text-xs text-gray-400 border-transparent border">Неделя</button>
+                        <button onclick="setStatFilter('month')" id="flt-month" class="stat-filter-btn px-4 py-2 rounded-xl glass-panel text-xs text-gray-400 border-transparent border">Месяц</button>
+                    </div>
                 </div>
                 
-                <div class="glass-panel p-4 h-64">
+                <!-- Report Export -->
+                <div class="flex justify-end mb-2">
+                    <button onclick="exportToPDF()" class="text-xs flex items-center gap-1 text-[var(--accent-1)] bg-[var(--accent-1)]/10 px-3 py-1.5 rounded-lg">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        Экспорт PDF
+                    </button>
+                </div>
+
+                <div class="glass-panel p-4 h-64" id="stats-pdf-area">
                     <canvas id="stats-chart"></canvas>
                 </div>
 
                 <div>
-                    <h3 class="font-bold mb-4 text-lg">Список всех трат</h3>
+                    <h3 class="font-bold mb-4 text-lg">Детализация</h3>
                     <div id="stats-list" class="space-y-3"></div>
                 </div>
             </div>
 
-            <!-- VIEW: CREDITS -->
-            <div id="view-credits" class="app-view hidden space-y-6 animate-fade-in">
-                <h2 class="text-2xl font-bold text-center">Мои кредиты</h2>
-                <button onclick="openModal('modal-add-credit')" class="bg-gradient-btn w-full py-4 rounded-2xl font-semibold flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                    Добавить кредит
-                </button>
+            <!-- VIEW: FINANCE (Credits, Debts, Piggy Banks, Subs, Budgets) -->
+            <div id="view-finance" class="app-view hidden space-y-6 animate-fade-in">
+                <h2 class="text-2xl font-bold mb-2">Финансы 🏦</h2>
                 
-                <div>
-                    <h3 class="font-bold mb-4 text-lg text-teal-400">Активные кредиты</h3>
+                <!-- Horizontal Tab Menu -->
+                <div class="flex gap-2 overflow-x-auto no-scrollbar pb-2 mb-2">
+                    <button onclick="switchFinTab('credits')" id="tab-credits" class="fin-tab-btn px-4 py-2 rounded-xl glass-panel text-sm font-semibold bg-white/10 text-white border-[var(--accent-2)] border whitespace-nowrap">Кредиты</button>
+                    <button onclick="switchFinTab('piggy')" id="tab-piggy" class="fin-tab-btn px-4 py-2 rounded-xl glass-panel text-sm text-gray-400 border-transparent border whitespace-nowrap">Копилка 🐷</button>
+                    <button onclick="switchFinTab('subs')" id="tab-subs" class="fin-tab-btn px-4 py-2 rounded-xl glass-panel text-sm text-gray-400 border-transparent border whitespace-nowrap">Подписки 🔁</button>
+                    <button onclick="switchFinTab('budgets')" id="tab-budgets" class="fin-tab-btn px-4 py-2 rounded-xl glass-panel text-sm text-gray-400 border-transparent border whitespace-nowrap">Бюджет 💰</button>
+                </div>
+
+                <!-- Credits Section -->
+                <div id="fin-sec-credits" class="fin-sec space-y-4">
+                    <button onclick="openModal('modal-add-credit')" class="bg-gradient-btn w-full py-4 rounded-2xl font-semibold flex items-center justify-center gap-2 shadow-lg">Добавить кредит/долг</button>
                     <div id="credits-active-list" class="space-y-4"></div>
                 </div>
 
-                <details class="glass-panel group">
-                    <summary class="p-4 font-bold cursor-pointer outline-none flex justify-between items-center text-gray-400">
-                        Завершённые кредиты
-                        <svg class="w-5 h-5 transform group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </summary>
-                    <div class="p-4 pt-0 border-t border-gray-800 mt-2" id="credits-completed-list"></div>
-                </details>
+                <!-- Piggy Bank Section -->
+                <div id="fin-sec-piggy" class="fin-sec hidden space-y-4">
+                    <button onclick="openModal('modal-add-piggy')" class="border border-[var(--accent-1)] text-[var(--accent-1)] w-full py-4 rounded-2xl font-semibold flex items-center justify-center gap-2 border-dashed">Добавить цель</button>
+                    <div id="piggy-list" class="space-y-4"></div>
+                </div>
+
+                <!-- Subscriptions Section -->
+                <div id="fin-sec-subs" class="fin-sec hidden space-y-4">
+                    <button onclick="showToast('Функция подписок в разработке')" class="bg-[#1a1a1a] w-full py-4 rounded-2xl font-semibold text-gray-400">Добавить подписку (Скоро)</button>
+                    <div class="text-center text-gray-600 py-4 text-sm">Здесь будут отображаться ваши ежемесячные списания (Netflix, Spotify и т.д.)</div>
+                </div>
+
+                <!-- Budgets Section -->
+                <div id="fin-sec-budgets" class="fin-sec hidden space-y-4">
+                    <div class="glass-panel p-5">
+                        <h3 class="font-bold mb-2 text-[var(--accent-2)]">Общий лимит на месяц</h3>
+                        <input type="number" id="budget-input" placeholder="Сумма лимита" class="input-field mb-3 bg-black/40" onblur="saveBudgetLimit()">
+                        <p class="text-xs text-gray-400">Если вы превысите лимит, приложение предупредит вас.</p>
+                    </div>
+                </div>
             </div>
 
             <!-- VIEW: SETTINGS -->
             <div id="view-settings" class="app-view hidden space-y-6 animate-fade-in">
                 <div class="glass-panel p-8 text-center relative overflow-hidden">
-                    <div class="absolute top-0 right-0 w-32 h-32 bg-purple-600 rounded-full blur-[4rem] opacity-20"></div>
+                    <div class="absolute top-0 right-0 w-32 h-32 bg-[var(--accent-1)] rounded-full blur-[4rem] opacity-20"></div>
                     <div class="w-24 h-24 rounded-full bg-gradient-btn mx-auto flex items-center justify-center text-4xl font-bold mb-4 shadow-lg shadow-purple-500/30" id="settings-avatar">Г</div>
                     <h2 class="text-2xl font-bold mb-1" id="settings-name">Гость</h2>
-                    <p class="text-teal-400 text-sm font-mono bg-black/30 inline-block px-3 py-1 rounded-lg" id="settings-id">ID: guest</p>
+                    <p class="text-[var(--accent-2)] text-sm font-mono bg-black/30 inline-block px-3 py-1 rounded-lg" id="settings-id">ID: guest</p>
                 </div>
 
                 <div class="space-y-3">
-                    <button onclick="exportData('csv')" class="w-full glass-panel p-4 text-left font-semibold flex items-center justify-between hover:bg-white/5 transition-colors">
+                    <h3 class="text-sm font-bold text-gray-400 ml-2 mt-4">Настройки приложения</h3>
+                    
+                    <!-- Feature Toggles -->
+                    <div class="glass-panel p-4 flex justify-between items-center">
+                        <span class="font-semibold text-sm">Валюта 💵</span>
+                        <select id="setting-currency" class="bg-[#111] text-white p-1 rounded outline-none text-sm border border-gray-700" onchange="changeCurrency()">
+                            <option value="₽">RUB (₽)</option>
+                            <option value="$">USD ($)</option>
+                            <option value="€">EUR (€)</option>
+                            <option value="₿">BTC (₿)</option>
+                        </select>
+                    </div>
+
+                    <div class="glass-panel p-4 flex justify-between items-center">
+                        <span class="font-semibold text-sm">Тема оформления 🎨</span>
+                        <select id="setting-theme" class="bg-[#111] text-white p-1 rounded outline-none text-sm border border-gray-700" onchange="changeTheme()">
+                            <option value="default">Киберпанк (Фиол/Бир)</option>
+                            <option value="pink">Неон (Розовый)</option>
+                            <option value="orange">Закат (Оранж/Желт)</option>
+                            <option value="blue">Космос (Синий)</option>
+                        </select>
+                    </div>
+
+                    <div class="glass-panel p-4 flex justify-between items-center cursor-pointer" onclick="toggleSetting('pin')">
+                        <span class="font-semibold text-sm">Вход по PIN-коду 🔐</span>
+                        <div class="w-10 h-6 bg-gray-700 rounded-full relative transition-colors" id="toggle-pin-ui">
+                            <div class="w-4 h-4 bg-white rounded-full absolute top-1 left-1 transition-transform" id="toggle-pin-knob"></div>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel p-4 flex justify-between items-center cursor-pointer" onclick="toggleMock('cloud', 'Облачный бэкап включен!')">
+                        <span class="font-semibold text-sm">Облачный бэкап 🌐</span>
+                        <div class="text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">PRO</div>
+                    </div>
+
+                    <div class="glass-panel p-4 flex justify-between items-center cursor-pointer" onclick="toggleMock('family', 'Семейный доступ активирован!')">
+                        <span class="font-semibold text-sm">Семейный доступ 👪</span>
+                        <div class="text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">PRO</div>
+                    </div>
+
+                    <h3 class="text-sm font-bold text-gray-400 ml-2 mt-6">Управление данными</h3>
+                    <button onclick="exportData('csv')" class="w-full glass-panel p-4 text-left text-sm font-semibold flex items-center justify-between hover:bg-white/5 transition-colors">
                         Скачать траты (CSV) <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                     </button>
-                    <button onclick="exportData('json')" class="w-full glass-panel p-4 text-left font-semibold flex items-center justify-between hover:bg-white/5 transition-colors">
-                        Скачать траты (JSON) <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    <button onclick="exportData('json')" class="w-full glass-panel p-4 text-left text-sm font-semibold flex items-center justify-between hover:bg-white/5 transition-colors">
+                        Скачать резервную копию (JSON) <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                     </button>
-                    <button onclick="exportLogs()" class="w-full glass-panel p-4 text-left font-semibold flex items-center justify-between hover:bg-white/5 transition-colors">
-                        Скачать логи <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                    </button>
-                    <label class="w-full glass-panel p-4 text-left font-semibold flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors">
-                        Вставить траты (Импорт)
-                        <input type="file" id="import-file" class="hidden" accept=".json,.csv" onchange="importData(event)">
+                    <label class="w-full glass-panel p-4 text-left text-sm font-semibold flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors">
+                        Восстановить из файла (Импорт)
+                        <input type="file" id="import-file" class="hidden" accept=".json" onchange="importData(event)">
                         <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
                     </label>
+
                     <button onclick="openModal('modal-logout')" class="w-full p-4 text-center font-bold text-red-400 glass-panel border border-red-500/30 mt-6 hover:bg-red-500/10 transition-colors">
                         Выйти из аккаунта
                     </button>
@@ -285,7 +422,7 @@
 
         <!-- Bottom Navigation -->
         <nav class="absolute bottom-0 w-full glass-panel rounded-b-none border-b-0 border-x-0 flex justify-around p-2 pt-3 pb-6 z-20 bg-[#0a0a0a]/90 backdrop-blur-xl">
-            <button onclick="switchView('view-home')" id="nav-view-home" class="nav-btn flex flex-col items-center text-purple-400 w-16 transition-colors">
+            <button onclick="switchView('view-home')" id="nav-view-home" class="nav-btn flex flex-col items-center text-[var(--accent-1)] w-16 transition-colors">
                 <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
                 <span class="text-[10px] font-medium">Главная</span>
             </button>
@@ -297,9 +434,9 @@
                 <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
                 <span class="text-[10px] font-medium">Траты</span>
             </button>
-            <button onclick="switchView('view-credits')" id="nav-view-credits" class="nav-btn flex flex-col items-center text-gray-500 w-16 transition-colors">
+            <button onclick="switchView('view-finance')" id="nav-view-finance" class="nav-btn flex flex-col items-center text-gray-500 w-16 transition-colors">
                 <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
-                <span class="text-[10px] font-medium">Кредиты</span>
+                <span class="text-[10px] font-medium">Финансы</span>
             </button>
             <button onclick="switchView('view-settings')" id="nav-view-settings" class="nav-btn flex flex-col items-center text-gray-500 w-16 transition-colors">
                 <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
@@ -311,26 +448,45 @@
     <!-- Modals -->
     <!-- Add Expense -->
     <div id="modal-add-expense" class="hidden absolute inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm">
-        <div class="glass-panel w-full sm:max-w-md p-6 rounded-b-none sm:rounded-2xl flex flex-col gap-4 animate-slide-up sm:animate-fade-in bg-[#111]">
-            <h3 class="text-xl font-bold mb-2">Новая трата</h3>
-            <input type="number" id="exp-amount" placeholder="Сумма (₽)" class="input-field text-xl" step="0.01" inputmode="decimal">
-            <select id="exp-category" class="input-field" onchange="toggleCreditSelect()">
-                <option value="еда">Еда</option>
-                <option value="транспорт">Транспорт</option>
-                <option value="жильё">Жильё</option>
-                <option value="развлечения">Развлечения</option>
-                <option value="прочее">Прочее</option>
-                <option value="Платёж по кредиту" class="text-teal-400 font-bold">Платёж по кредиту</option>
+        <div class="glass-panel w-full sm:max-w-md p-6 rounded-b-none sm:rounded-2xl flex flex-col gap-3 animate-slide-up sm:animate-fade-in bg-[#111] max-h-[90vh] overflow-y-auto no-scrollbar relative">
+            
+            <div class="flex justify-between items-center mb-1">
+                <h3 class="text-xl font-bold">Новая трата 💸</h3>
+                <button onclick="mockScanner()" class="text-xs bg-white/10 px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-white/20">
+                    📷 Скан чека
+                </button>
+            </div>
+            
+            <!-- Quick Templates -->
+            <div class="flex gap-2 overflow-x-auto no-scrollbar py-1 mb-1">
+                <button onclick="applyTemplate('Кофе', 200)" class="whitespace-nowrap px-3 py-1 bg-gray-800 rounded-full text-xs">☕ Кофе 200</button>
+                <button onclick="applyTemplate('Шаурма', 350)" class="whitespace-nowrap px-3 py-1 bg-gray-800 rounded-full text-xs">🌯 Шаурма 350</button>
+                <button onclick="applyTemplate('Такси', 500)" class="whitespace-nowrap px-3 py-1 bg-gray-800 rounded-full text-xs">🚕 Такси 500</button>
+            </div>
+
+            <!-- Calculator Input -->
+            <div class="relative">
+                <input type="text" id="exp-amount" placeholder="Сумма (можно формулу: 150+300)" class="input-field text-xl font-mono" onblur="evalCalculator(this)">
+                <span class="absolute right-4 top-4 text-gray-500 font-bold" id="exp-currency-label">₽</span>
+            </div>
+
+            <!-- Custom Category -->
+            <input list="category-list" id="exp-category" class="input-field" placeholder="Категория (выберите или впишите)" onchange="toggleCreditSelect()">
+            <datalist id="category-list">
+                <option value="Еда"></option>
+                <option value="Транспорт"></option>
+                <option value="Жильё"></option>
+                <option value="Развлечения"></option>
+                <option value="Шаурма 🌯"></option>
+                <option value="Платёж по кредиту"></option>
+            </datalist>
+
+            <select id="exp-credit-id" class="input-field hidden bg-[var(--accent-2)]/10 border-[var(--accent-2)]/50 text-[var(--accent-2)]">
+                <option value="">Выберите кредит/цель...</option>
             </select>
-            <select id="exp-credit-id" class="input-field hidden bg-teal-900/20 border-teal-500/50 text-teal-300">
-                <option value="">Выберите кредит...</option>
-            </select>
+            
             <input type="text" id="exp-place" placeholder="Место (опционально)" class="input-field">
-            <label class="flex items-center gap-3 text-sm text-gray-400 cursor-pointer p-1">
-                <input type="checkbox" id="exp-location" class="w-5 h-5 rounded bg-[#1a1a1a] border-gray-600 text-purple-500 focus:ring-purple-500/50 accent-purple-500">
-                Определить местоположение
-            </label>
-            <textarea id="exp-comment" placeholder="Комментарий" class="input-field resize-none h-20"></textarea>
+            <input type="text" id="exp-comment" placeholder="Комментарий" class="input-field">
             
             <div class="flex gap-3 mt-4">
                 <button onclick="closeModal('modal-add-expense')" class="flex-1 bg-[#222] py-4 rounded-xl font-semibold">Отмена</button>
@@ -343,13 +499,13 @@
     <div id="modal-add-income" class="hidden absolute inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm">
         <div class="glass-panel w-full sm:max-w-md p-6 rounded-b-none sm:rounded-2xl flex flex-col gap-4 animate-slide-up sm:animate-fade-in bg-[#111]">
             <h3 class="text-xl font-bold mb-2 text-green-400">Новый доход</h3>
-            <input type="number" id="inc-amount" placeholder="Сумма (₽)" class="input-field text-xl border-green-500/50 focus:border-green-500" step="0.01" inputmode="decimal">
+            <input type="number" id="inc-amount" placeholder="Сумма" class="input-field text-xl border-green-500/50" step="0.01">
             <input type="text" id="inc-source" placeholder="Источник (Зарплата, перевод...)" class="input-field">
-            <textarea id="inc-comment" placeholder="Комментарий" class="input-field resize-none h-20"></textarea>
+            <input type="text" id="inc-comment" placeholder="Комментарий" class="input-field">
             
             <div class="flex gap-3 mt-4">
                 <button onclick="closeModal('modal-add-income')" class="flex-1 bg-[#222] py-4 rounded-xl font-semibold">Отмена</button>
-                <button onclick="saveIncome()" class="flex-[2] bg-green-600 hover:bg-green-500 py-4 rounded-xl font-semibold text-lg shadow-lg">Сохранить</button>
+                <button onclick="saveIncome()" class="flex-[2] bg-green-600 hover:bg-green-500 py-4 rounded-xl font-semibold text-lg shadow-lg">Пополнить</button>
             </div>
         </div>
     </div>
@@ -357,20 +513,34 @@
     <!-- Add Credit -->
     <div id="modal-add-credit" class="hidden absolute inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm">
         <div class="glass-panel w-full sm:max-w-md p-6 rounded-b-none sm:rounded-2xl flex flex-col gap-3 animate-slide-up sm:animate-fade-in bg-[#111] max-h-[90vh] overflow-y-auto no-scrollbar">
-            <h3 class="text-xl font-bold mb-2 text-teal-400">Оформить кредит</h3>
-            <input type="text" id="cred-name" placeholder="Название (напр. Автокредит)" class="input-field">
-            <input type="number" id="cred-total" placeholder="Общая сумма (₽)" class="input-field" step="0.01">
+            <h3 class="text-xl font-bold mb-2 text-[var(--accent-2)]">Новый долг / Кредит</h3>
+            <input type="text" id="cred-name" placeholder="Название (напр. Ипотека)" class="input-field">
+            <input type="number" id="cred-total" placeholder="Общая сумма" class="input-field" step="0.01">
             <div class="flex gap-3">
-                <input type="number" id="cred-rate" placeholder="Ставка % годовых" class="input-field flex-1" step="0.1">
+                <input type="number" id="cred-rate" placeholder="Ставка % в год" class="input-field flex-1" step="0.1" value="0">
                 <input type="number" id="cred-term" placeholder="Срок (мес)" class="input-field flex-1">
             </div>
-            <input type="date" id="cred-date" class="input-field text-gray-400" placeholder="Дата оформления">
-            <input type="text" id="cred-bank" placeholder="Банк / Организация" class="input-field">
-            <textarea id="cred-comment" placeholder="Комментарий" class="input-field resize-none h-16"></textarea>
+            <input type="date" id="cred-date" class="input-field text-gray-400">
+            <input type="text" id="cred-bank" placeholder="Кому должен / Банк" class="input-field">
             
             <div class="flex gap-3 mt-4 pt-2 border-t border-gray-800">
                 <button onclick="closeModal('modal-add-credit')" class="flex-1 bg-[#222] py-4 rounded-xl font-semibold">Отмена</button>
-                <button onclick="saveCredit()" class="flex-[2] bg-teal-600 hover:bg-teal-500 py-4 rounded-xl font-semibold text-lg shadow-lg">Создать</button>
+                <button onclick="saveCredit()" class="flex-[2] bg-[var(--accent-2)] hover:opacity-80 py-4 rounded-xl font-semibold text-lg shadow-lg text-black">Создать</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Piggy Bank -->
+    <div id="modal-add-piggy" class="hidden absolute inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm">
+        <div class="glass-panel w-full sm:max-w-md p-6 rounded-b-none sm:rounded-2xl flex flex-col gap-4 animate-slide-up sm:animate-fade-in bg-[#111]">
+            <h3 class="text-xl font-bold mb-2 text-[var(--accent-1)]">Цель / Копилка 🐷</h3>
+            <input type="text" id="piggy-name" placeholder="На что копим? (MacBook, Отпуск...)" class="input-field">
+            <input type="number" id="piggy-target" placeholder="Нужная сумма" class="input-field">
+            <input type="number" id="piggy-current" placeholder="Уже есть (опционально)" class="input-field" value="0">
+            
+            <div class="flex gap-3 mt-4">
+                <button onclick="closeModal('modal-add-piggy')" class="flex-1 bg-[#222] py-4 rounded-xl font-semibold">Отмена</button>
+                <button onclick="savePiggy()" class="flex-[2] bg-[var(--accent-1)] hover:opacity-80 py-4 rounded-xl font-semibold text-lg shadow-lg text-white">Создать</button>
             </div>
         </div>
     </div>
@@ -378,16 +548,12 @@
     <!-- Logout Confirm -->
     <div id="modal-logout" class="hidden absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
         <div class="glass-panel w-full max-w-sm p-6 rounded-3xl flex flex-col items-center text-center animate-fade-in bg-[#111]">
-            <img src="images/vnimanie.png" alt="Внимание" class="h-16 mb-4 object-contain" onerror="this.outerHTML='<div class=\'text-red-500 mb-4\'><svg class=\'w-16 h-16\' fill=\'none\' stroke=\'currentColor\' viewBox=\'0 0 24 24\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z\'></path></svg></div>'">
+            <div class='text-red-500 mb-4'><svg class='w-16 h-16' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z'></path></svg></div>
             <h3 class="text-xl font-bold mb-2">Внимание</h3>
-            <p class="text-gray-400 mb-6 text-sm">Вы действительно хотите выйти из аккаунта?</p>
-            <div class="w-full space-y-3 mb-6">
-                <button onclick="exportLogs()" class="w-full bg-[#1a1a1a] py-3 rounded-xl text-sm font-semibold text-gray-300">Скачать логи</button>
-                <button onclick="exportData('csv')" class="w-full bg-[#1a1a1a] py-3 rounded-xl text-sm font-semibold text-gray-300">Скачать траты</button>
-            </div>
+            <p class="text-gray-400 mb-6 text-sm">Вы действительно хотите выйти?</p>
             <div class="flex gap-3 w-full">
                 <button onclick="closeModal('modal-logout')" class="flex-1 border border-gray-600 py-3 rounded-xl font-semibold">Нет</button>
-                <button onclick="executeLogout()" class="flex-1 bg-red-600 hover:bg-red-500 py-3 rounded-xl font-semibold shadow-lg">Да, выйти</button>
+                <button onclick="executeLogout(true)" class="flex-1 bg-red-600 hover:bg-red-500 py-3 rounded-xl font-semibold shadow-lg">Да, выйти</button>
             </div>
         </div>
     </div>
@@ -397,21 +563,29 @@
 <script>
     // --- STATE MANAGEMENT ---
     let appData = {
-        user: null, // { id: string, name: string, isGuest: boolean }
+        user: null, // { id, name, isGuest }
         transactions: [], // { id, amount, category, date, place, comment, isIncome, creditId }
-        credits: [] // { id, name, totalAmount, remainingAmount, interestRate, startDate, termMonths, monthlyPayment, bank, comment, isActive }
+        credits: [], // { id, name, totalAmount, remainingAmount, interestRate, termMonths, monthlyPayment, bank, isActive }
+        piggyBanks: [], // { id, name, target, current }
+        settings: {
+            pin: '', // string (4 digits)
+            currency: '₽',
+            theme: 'default',
+            budgetLimit: null
+        }
     };
 
-    let charts = {
-        home: null,
-        stats: null
-    };
+    let charts = { home: null, stats: null };
+    let activeStatFilter = 'month'; // 'all', 'day', 'week', 'month'
+    let enteredPin = '';
+    let pinSetupMode = false;
 
     // --- UTILS ---
     const generateId = () => Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
     
     const formatMoney = (amount) => {
-        return parseFloat(amount).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' ₽';
+        const c = appData.settings?.currency || '₽';
+        return parseFloat(amount).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' ' + c;
     };
 
     const formatDate = (dateString) => {
@@ -419,19 +593,25 @@
         return d.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' });
     };
 
-    const saveLocally = () => {
-        localStorage.setItem('spendly_data', JSON.stringify(appData));
-    };
+    const saveLocally = () => localStorage.setItem('spendly_data', JSON.stringify(appData));
 
     const loadLocally = () => {
         const data = localStorage.getItem('spendly_data');
         if (data) {
             try {
-                appData = JSON.parse(data);
-                if(!appData.transactions) appData.transactions = [];
-                if(!appData.credits) appData.credits = [];
+                const parsed = JSON.parse(data);
+                appData = { ...appData, ...parsed };
+                if(!appData.piggyBanks) appData.piggyBanks = [];
+                if(!appData.settings) appData.settings = { pin:'', currency:'₽', theme:'default', budgetLimit: null };
             } catch(e) { console.error("Error loading data", e); }
         }
+    };
+
+    const showToast = (msg) => {
+        const t = document.getElementById('toast');
+        t.innerText = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 3000);
     };
 
     // --- NAVIGATION ---
@@ -440,33 +620,46 @@
         const screen = document.getElementById(screenId);
         if(screen) {
             screen.classList.remove('hidden');
-            if(screenId === 'screen-main') {
-                initMainInterface();
-            }
+            if(screenId === 'screen-main') initMainInterface();
         }
     }
 
     function switchView(viewId) {
         document.querySelectorAll('.app-view').forEach(el => el.classList.add('hidden'));
         document.getElementById(viewId).classList.remove('hidden');
+        document.getElementById('main-scroll-area').scrollTo(0,0);
         
-        // Update Bottom Nav Styling
         document.querySelectorAll('.nav-btn').forEach(btn => {
-            btn.classList.remove('text-purple-400');
+            btn.classList.remove('text-[var(--accent-1)]');
             btn.classList.add('text-gray-500');
         });
         const activeBtn = document.getElementById(`nav-${viewId}`);
         if(activeBtn) {
             activeBtn.classList.remove('text-gray-500');
-            activeBtn.classList.add('text-purple-400');
+            activeBtn.classList.add('text-[var(--accent-1)]');
         }
 
-        // Render specific view data
         if(viewId === 'view-home') renderHome();
         if(viewId === 'view-incomes') renderIncomes();
         if(viewId === 'view-stats') renderStats();
-        if(viewId === 'view-credits') renderCredits();
+        if(viewId === 'view-finance') { switchFinTab('credits'); renderFinance(); }
         if(viewId === 'view-settings') renderSettings();
+    }
+
+    function switchFinTab(tabId) {
+        document.querySelectorAll('.fin-sec').forEach(el => el.classList.add('hidden'));
+        document.getElementById(`fin-sec-${tabId}`).classList.remove('hidden');
+        
+        document.querySelectorAll('.fin-tab-btn').forEach(btn => {
+            btn.classList.remove('bg-white/10', 'text-white', 'border-[var(--accent-2)]');
+            btn.classList.add('text-gray-400', 'border-transparent');
+        });
+        const activeBtn = document.getElementById(`tab-${tabId}`);
+        if(activeBtn) {
+            activeBtn.classList.remove('text-gray-400', 'border-transparent');
+            activeBtn.classList.add('bg-white/10', 'text-white', 'border-[var(--accent-2)]');
+        }
+        renderFinance();
     }
 
     function openModal(modalId) {
@@ -478,131 +671,197 @@
         document.getElementById(modalId).classList.add('hidden');
     }
 
-    // --- AUTHENTICATION ---
-    function initApp() {
-        loadLocally();
-        setTimeout(() => {
-            if (appData.user) {
-                navigate('screen-main');
+    // --- AUTH & BOOT ---
+    function checkAuthAndPin() {
+        if(appData.user) {
+            if(appData.settings.pin && appData.settings.pin.length === 4) {
+                pinSetupMode = false;
+                navigate('screen-pin');
             } else {
-                navigate('screen-login');
+                navigate('screen-main');
             }
-        }, 2000); // 2 seconds splash screen
+        } else {
+            navigate('screen-login');
+        }
     }
 
-    function handleAuth(type) {
-        const email = document.getElementById('auth-email').value;
-        const pass = document.getElementById('auth-password').value;
-        const name = document.getElementById('auth-name').value || 'Пользователь';
-        
-        if(!email || pass.length < 6) return alert("Введите корректные данные (пароль мин 6 символов).");
+    window.onload = () => {
+        loadLocally();
+        changeTheme(appData.settings.theme); // Apply theme immediately
+        document.getElementById('exp-currency-label').innerText = appData.settings.currency || '₽';
+        setTimeout(checkAuthAndPin, 1500); // 1.5s splash
+    };
 
-        // Mock Auth
-        appData.user = {
-            id: 'usr_' + generateId(),
-            name: type === 'register' ? name : (email.split('@')[0] || 'User'),
-            isGuest: false
-        };
+    function handleAuth(type) {
+        const name = document.getElementById('auth-name').value || 'Транжира';
+        appData.user = { id: 'usr_' + generateId(), name: type === 'register' ? name : 'Владелец', isGuest: false };
         saveLocally();
         navigate('screen-main');
     }
 
     function loginGuest() {
-        appData.user = {
-            id: 'guest_' + generateId(),
-            name: 'Гость',
-            isGuest: true
-        };
+        appData.user = { id: 'guest_' + generateId(), name: 'Гость', isGuest: true };
         saveLocally();
         navigate('screen-main');
     }
 
-    function executeLogout() {
-        appData.user = null;
-        // Keep data or clear? For guest, we usually keep in local storage until cleared.
-        // We will just remove user to show login screen.
-        saveLocally();
-        closeModal('modal-logout');
-        navigate('screen-login');
-        document.querySelectorAll('input, textarea').forEach(el => el.value = '');
+    function executeLogout(force = false) {
+        if(force || confirm("Точно выйти?")) {
+            appData.user = null;
+            saveLocally();
+            closeModal('modal-logout');
+            navigate('screen-login');
+        }
     }
 
+    // --- PIN LOGIC ---
+    function updatePinUI() {
+        const dots = document.getElementById('pin-dots').children;
+        for(let i=0; i<4; i++) {
+            if(i < enteredPin.length) dots[i].classList.add('filled');
+            else dots[i].classList.remove('filled');
+        }
+    }
+    
+    function enterPin(num) {
+        if(enteredPin.length < 4) enteredPin += num;
+        updatePinUI();
+        if(enteredPin.length === 4) {
+            setTimeout(() => {
+                if(pinSetupMode) {
+                    appData.settings.pin = enteredPin;
+                    saveLocally();
+                    showToast('PIN-код установлен!');
+                    navigate('screen-main');
+                } else {
+                    if(enteredPin === appData.settings.pin) {
+                        navigate('screen-main');
+                    } else {
+                        showToast('Неверный PIN!');
+                        clearPin();
+                    }
+                }
+            }, 300);
+        }
+    }
+
+    function clearPin() {
+        enteredPin = '';
+        updatePinUI();
+    }
+
+    // --- CALCULATOR / EVAL ---
+    function evalCalculator(input) {
+        try {
+            // Safe eval only allowing math chars
+            let safeStr = input.value.replace(/[^\d.+\-*/()]/g, '');
+            if(safeStr) {
+                let res = Function('"use strict";return (' + safeStr + ')')();
+                input.value = parseFloat(res).toFixed(2);
+            }
+        } catch(e) {
+            // Keep original if invalid
+        }
+    }
+
+    // --- DATA FILTERS ---
+    function getExpenses() { return appData.transactions.filter(t => !t.isIncome); }
+    function getIncomes() { return appData.transactions.filter(t => t.isIncome); }
+
+    function filterByPeriod(txs, period) {
+        const now = new Date();
+        return txs.filter(t => {
+            const d = new Date(t.date);
+            if(period === 'day') return d.toDateString() === now.toDateString();
+            if(period === 'week') {
+                const diff = (now - d) / (1000 * 60 * 60 * 24);
+                return diff <= 7;
+            }
+            if(period === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+            return true; // 'all'
+        });
+    }
+
+    // --- MAIN RENDERERS ---
     function initMainInterface() {
         if(appData.user) {
-            document.getElementById('user-greeting').innerText = `Привет, ${appData.user.name}!`;
+            document.getElementById('user-greeting').innerText = `Привет, ${appData.user.name}! 👋`;
             document.getElementById('user-avatar-letter').innerText = appData.user.name.charAt(0).toUpperCase();
         }
         switchView('view-home');
     }
 
-    // --- RENDERERS ---
-
-    function getExpenses() { return appData.transactions.filter(t => !t.isIncome); }
-    function getIncomes() { return appData.transactions.filter(t => t.isIncome); }
-
     function renderHome() {
-        const expenses = getExpenses();
-        const totalExp = expenses.reduce((sum, t) => sum + t.amount, 0);
+        const monthExpenses = filterByPeriod(getExpenses(), 'month');
+        const totalExp = monthExpenses.reduce((sum, t) => sum + t.amount, 0);
         document.getElementById('home-total-expenses').innerText = formatMoney(totalExp);
         
-        // Recent 5
+        // Budget calculation
+        const limit = appData.settings.budgetLimit;
+        const bStatus = document.getElementById('home-budget-status');
+        if(limit) {
+            document.getElementById('home-budget-limit').innerText = formatMoney(limit);
+            if(totalExp > limit) {
+                bStatus.innerHTML = `<span class="text-red-400">Превышен на ${formatMoney(totalExp - limit)}!</span>`;
+            } else {
+                bStatus.innerHTML = `<span class="text-green-400">Осталось: ${formatMoney(limit - totalExp)}</span>`;
+            }
+        } else {
+            document.getElementById('home-budget-limit').innerText = "Не задан";
+            bStatus.innerHTML = "--";
+        }
+
+        // Recent
         const recent = [...appData.transactions].sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0,5);
         const list = document.getElementById('home-recent-list');
-        if(recent.length === 0) {
-            list.innerHTML = `<div class="text-center text-gray-500 py-4 glass-panel">Нет данных</div>`;
-        } else {
-            list.innerHTML = recent.map(t => `
-                <div class="glass-panel p-4 flex justify-between items-center">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full ${t.isIncome ? 'bg-green-500/20 text-green-400' : 'bg-purple-500/20 text-purple-400'} flex items-center justify-center">
-                            ${t.isIncome ? '+' : '-'}
-                        </div>
-                        <div>
-                            <div class="font-bold text-sm">${t.category}</div>
-                            <div class="text-xs text-gray-400">${formatDate(t.date)}</div>
-                        </div>
+        if(recent.length === 0) list.innerHTML = `<div class="text-center text-gray-500 py-4 glass-panel">Пока пусто. Добавь трату!</div>`;
+        else list.innerHTML = recent.map(t => `
+            <div class="glass-panel p-4 flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full ${t.isIncome ? 'bg-green-500/20 text-green-400' : 'bg-purple-500/20 text-[var(--accent-1)]'} flex items-center justify-center">
+                        ${t.isIncome ? '+' : '-'}
                     </div>
-                    <div class="${t.isIncome ? 'text-green-400' : 'text-white'} font-bold">
-                        ${t.isIncome ? '+' : '-'}${formatMoney(t.amount)}
+                    <div>
+                        <div class="font-bold text-sm">${t.category}</div>
+                        <div class="text-xs text-gray-400">${formatDate(t.date)}</div>
                     </div>
                 </div>
-            `).join('');
-        }
+                <div class="${t.isIncome ? 'text-green-400' : 'text-white'} font-bold">
+                    ${t.isIncome ? '+' : '-'}${formatMoney(t.amount)}
+                </div>
+            </div>
+        `).join('');
 
         // Chart
         const ctx = document.getElementById('home-chart');
         if(charts.home) charts.home.destroy();
         
-        if(expenses.length === 0) {
+        if(monthExpenses.length === 0) {
             charts.home = new Chart(ctx, { type: 'doughnut', data: { labels: ['Пусто'], datasets: [{ data: [1], backgroundColor: ['#1a1a1a'], borderWidth: 0 }] }, options: { cutout: '80%', plugins:{tooltip:{enabled:false}, legend:{display:false}} } });
             return;
         }
 
         const categories = {};
-        expenses.forEach(e => { categories[e.category] = (categories[e.category]||0) + e.amount; });
+        monthExpenses.forEach(e => { categories[e.category] = (categories[e.category]||0) + e.amount; });
         
         Chart.defaults.color = '#fff';
         Chart.defaults.font.family = 'Unbounded';
         
+        const style = getComputedStyle(document.body);
+        const col1 = style.getPropertyValue('--accent-1').trim() || '#a855f7';
+        const col2 = style.getPropertyValue('--accent-2').trim() || '#2dd4bf';
+
         charts.home = new Chart(ctx, {
             type: 'doughnut',
             data: {
                 labels: Object.keys(categories),
                 datasets: [{
                     data: Object.values(categories),
-                    backgroundColor: ['#a855f7', '#2dd4bf', '#ec4899', '#f59e0b', '#3b82f6', '#14b8a6', '#8b5cf6'],
-                    borderWidth: 0,
-                    hoverOffset: 4
+                    backgroundColor: [col1, col2, '#ec4899', '#f59e0b', '#3b82f6', '#14b8a6', '#8b5cf6'],
+                    borderWidth: 0, hoverOffset: 4
                 }]
             },
-            options: { 
-                responsive: true, 
-                maintainAspectRatio: false, 
-                cutout: '75%',
-                plugins: { 
-                    legend: { display: false } 
-                } 
-            }
+            options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { display: false } } }
         });
     }
 
@@ -618,67 +877,75 @@
         document.getElementById('incomes-total-out').innerText = formatMoney(totalOut);
 
         const list = document.getElementById('incomes-list');
-        if(incomes.length === 0) {
-            list.innerHTML = `<div class="text-center text-gray-500 py-4 glass-panel">Нет доходов</div>`;
-        } else {
-            list.innerHTML = [...incomes].sort((a,b) => new Date(b.date) - new Date(a.date)).map(t => `
-                <div class="glass-panel p-4 flex justify-between items-center">
-                    <div>
-                        <div class="font-bold text-sm">${t.category}</div>
-                        <div class="text-xs text-gray-400">${formatDate(t.date)} ${t.comment ? '• '+t.comment : ''}</div>
-                    </div>
-                    <div class="text-green-400 font-bold">+${formatMoney(t.amount)}</div>
+        if(incomes.length === 0) list.innerHTML = `<div class="text-center text-gray-500 py-4 glass-panel">Нет доходов</div>`;
+        else list.innerHTML = [...incomes].sort((a,b) => new Date(b.date) - new Date(a.date)).map(t => `
+            <div class="glass-panel p-4 flex justify-between items-center">
+                <div>
+                    <div class="font-bold text-sm">${t.category}</div>
+                    <div class="text-xs text-gray-400">${formatDate(t.date)} ${t.comment ? '• '+t.comment : ''}</div>
                 </div>
-            `).join('');
-        }
+                <div class="text-green-400 font-bold">+${formatMoney(t.amount)}</div>
+            </div>
+        `).join('');
+    }
+
+    function setStatFilter(f) {
+        activeStatFilter = f;
+        document.querySelectorAll('.stat-filter-btn').forEach(b => {
+            b.classList.remove('bg-white/10', 'text-white', 'border-[var(--accent-2)]');
+            b.classList.add('text-gray-400', 'border-transparent');
+        });
+        document.getElementById('flt-'+f).classList.add('bg-white/10', 'text-white', 'border-[var(--accent-2)]');
+        renderStats();
     }
 
     function renderStats() {
-        const expenses = getExpenses();
-        const list = document.getElementById('stats-list');
+        let expenses = filterByPeriod(getExpenses(), activeStatFilter);
         
-        if(expenses.length === 0) {
-            list.innerHTML = `<div class="text-center text-gray-500 py-4 glass-panel">Нет трат</div>`;
-        } else {
-            list.innerHTML = [...expenses].sort((a,b) => new Date(b.date) - new Date(a.date)).map(t => `
-                <div class="glass-panel p-4 flex flex-col gap-2">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <div class="font-bold text-sm text-purple-300">${t.category}</div>
-                            <div class="text-xs text-gray-400">${formatDate(t.date)}</div>
-                        </div>
-                        <div class="font-bold text-white">-${formatMoney(t.amount)}</div>
-                    </div>
-                    ${(t.place || t.comment) ? `<div class="text-xs text-gray-400 mt-1 pt-2 border-t border-gray-800">${t.place ? '📍 '+t.place : ''} ${t.comment}</div>` : ''}
-                </div>
-            `).join('');
+        // Search filter
+        const q = document.getElementById('search-tx').value.toLowerCase();
+        if(q) {
+            expenses = expenses.filter(t => 
+                t.category.toLowerCase().includes(q) || 
+                (t.comment && t.comment.toLowerCase().includes(q)) || 
+                (t.place && t.place.toLowerCase().includes(q))
+            );
         }
 
-        // Stats Chart (Bar)
+        const list = document.getElementById('stats-list');
+        if(expenses.length === 0) list.innerHTML = `<div class="text-center text-gray-500 py-4 glass-panel">Ничего не найдено</div>`;
+        else list.innerHTML = [...expenses].sort((a,b) => new Date(b.date) - new Date(a.date)).map(t => `
+            <div class="glass-panel p-4 flex flex-col gap-2">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div class="font-bold text-sm text-[var(--accent-2)]">${t.category}</div>
+                        <div class="text-xs text-gray-400">${formatDate(t.date)}</div>
+                    </div>
+                    <div class="font-bold text-white">-${formatMoney(t.amount)}</div>
+                </div>
+                ${(t.place || t.comment) ? `<div class="text-xs text-gray-400 mt-1 pt-2 border-t border-gray-800">${t.place ? '📍 '+t.place : ''} ${t.comment}</div>` : ''}
+            </div>
+        `).join('');
+
+        // Chart
         const ctx = document.getElementById('stats-chart');
         if(charts.stats) charts.stats.destroy();
-        
         if(expenses.length === 0) return;
 
-        // Group by category for simplicity here
         const categories = {};
         expenses.forEach(e => { categories[e.category] = (categories[e.category]||0) + e.amount; });
+
+        const style = getComputedStyle(document.body);
+        const col1 = style.getPropertyValue('--accent-1').trim() || '#a855f7';
 
         charts.stats = new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: Object.keys(categories),
-                datasets: [{
-                    label: 'Траты',
-                    data: Object.values(categories),
-                    backgroundColor: '#a855f7',
-                    borderRadius: 4
-                }]
+                datasets: [{ data: Object.values(categories), backgroundColor: col1, borderRadius: 4 }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
+                responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
                 scales: {
                     y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#888' } },
                     x: { grid: { display: false }, ticks: { color: '#888' } }
@@ -687,66 +954,43 @@
         });
     }
 
-    function renderCredits() {
+    function renderFinance() {
+        // Credits
         const activeList = document.getElementById('credits-active-list');
-        const completedList = document.getElementById('credits-completed-list');
-        
         const active = appData.credits.filter(c => c.isActive);
-        const completed = appData.credits.filter(c => !c.isActive);
-
-        const renderCard = (c) => {
+        activeList.innerHTML = active.length ? active.map(c => {
             const progress = ((c.totalAmount - c.remainingAmount) / c.totalAmount) * 100;
-            let pColor = 'bg-green-500'; // Actually requirement says: green 0-50, yellow 51-90, red 91-100.
-            // This usually applies to DEBT remaining, but prompt says "процент погашения". Let's assume debt remaining logic:
-            if(progress > 90) pColor = 'bg-green-500'; // almost done
-            else if(progress > 50) pColor = 'bg-yellow-500';
-            else pColor = 'bg-red-500'; // Just finished or early
-            // Wait, prompt exact wording: "зелёный 0–50 %, жёлтый 51–90 %, красный 91–100 %". I'll just follow it strictly using progress value directly.
-            
             let strictlyColor = 'bg-green-500';
             if(progress >= 51 && progress <= 90) strictlyColor = 'bg-yellow-500';
             if(progress > 90) strictlyColor = 'bg-red-500';
-
             return `
-                <div class="glass-panel p-5 relative overflow-hidden">
-                    <div class="absolute top-0 right-0 p-3">
-                        ${c.isActive ? '<span class="flex h-3 w-3 relative"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span><span class="relative inline-flex rounded-full h-3 w-3 bg-teal-500"></span></span>' : '<span class="text-xs text-gray-500 font-bold">ЗАВЕРШЕН</span>'}
-                    </div>
-                    <h4 class="font-bold text-lg text-teal-300 mb-1">${c.name}</h4>
-                    <p class="text-xs text-gray-400 mb-4">${c.bank} • ${c.interestRate}% годовых</p>
-                    
-                    <div class="flex justify-between text-sm mb-1">
-                        <span class="text-gray-400">Остаток:</span>
-                        <span class="font-bold">${formatMoney(c.remainingAmount)}</span>
-                    </div>
-                    <div class="flex justify-between text-sm mb-3">
-                        <span class="text-gray-400">Платёж:</span>
-                        <span class="font-bold text-white">${formatMoney(c.monthlyPayment)} / мес</span>
-                    </div>
-
+                <div class="glass-panel p-5 relative overflow-hidden border-l-4 border-[var(--accent-2)]">
+                    <h4 class="font-bold text-lg mb-1">${c.name}</h4>
+                    <p class="text-xs text-gray-400 mb-4">${c.bank || 'Долг'} • ${c.interestRate}% годовых</p>
+                    <div class="flex justify-between text-sm mb-1"><span class="text-gray-400">Остаток:</span><span class="font-bold">${formatMoney(c.remainingAmount)}</span></div>
                     <div class="mt-4">
-                        <div class="flex justify-between text-xs mb-1">
-                            <span>Погашено: ${progress.toFixed(1)}%</span>
-                            <span>Из ${formatMoney(c.totalAmount)}</span>
-                        </div>
-                        <div class="progress-container">
-                            <div class="progress-bar ${strictlyColor}" style="width: ${progress}%"></div>
-                        </div>
+                        <div class="flex justify-between text-xs mb-1"><span>Погашено: ${progress.toFixed(1)}%</span></div>
+                        <div class="progress-container"><div class="progress-bar ${strictlyColor}" style="width: ${progress}%"></div></div>
                     </div>
-                    
-                    ${c.isActive ? `
-                    <div class="mt-4 pt-3 border-t border-gray-800 flex justify-end">
-                        <button onclick="deleteCredit('${c.id}')" class="text-xs text-red-400 hover:text-red-300 transition-colors">Удалить кредит</button>
-                    </div>` : ''}
-                </div>
-            `;
-        };
+                </div>`;
+        }).join('') : `<div class="text-center text-gray-500 py-4 glass-panel border-dashed">Нет долгов! 🎉</div>`;
 
-        if(active.length === 0) activeList.innerHTML = `<div class="text-center text-gray-500 py-6 glass-panel border-dashed">У вас нет активных кредитов</div>`;
-        else activeList.innerHTML = active.map(renderCard).join('');
-
-        if(completed.length === 0) completedList.innerHTML = `<div class="text-center text-gray-600 py-4">Нет завершённых кредитов</div>`;
-        else completedList.innerHTML = completed.map(renderCard).join('');
+        // Piggy Banks
+        const piggyList = document.getElementById('piggy-list');
+        piggyList.innerHTML = appData.piggyBanks.length ? appData.piggyBanks.map(p => {
+            const progress = Math.min((p.current / p.target) * 100, 100);
+            return `
+                <div class="glass-panel p-5 border-l-4 border-[var(--accent-1)]">
+                    <h4 class="font-bold text-lg mb-1">${p.name}</h4>
+                    <div class="flex justify-between text-sm mb-2"><span class="text-gray-400">Собрано:</span><span class="font-bold text-[var(--accent-1)]">${formatMoney(p.current)} / ${formatMoney(p.target)}</span></div>
+                    <div class="progress-container"><div class="progress-bar bg-[var(--accent-1)]" style="width: ${progress}%"></div></div>
+                </div>`;
+        }).join('') : `<div class="text-center text-gray-500 py-4 glass-panel border-dashed">Копилок пока нет</div>`;
+        
+        // Budgets
+        if(appData.settings.budgetLimit) {
+            document.getElementById('budget-input').value = appData.settings.budgetLimit;
+        }
     }
 
     function renderSettings() {
@@ -754,6 +998,19 @@
             document.getElementById('settings-name').innerText = appData.user.name;
             document.getElementById('settings-id').innerText = `ID: ${appData.user.id}`;
             document.getElementById('settings-avatar').innerText = appData.user.name.charAt(0).toUpperCase();
+        }
+        document.getElementById('setting-currency').value = appData.settings.currency || '₽';
+        document.getElementById('setting-theme').value = appData.settings.theme || 'default';
+        
+        // PIN toggle update
+        const pinUI = document.getElementById('toggle-pin-ui');
+        const pinKnob = document.getElementById('toggle-pin-knob');
+        if(appData.settings.pin && appData.settings.pin.length === 4) {
+            pinUI.classList.replace('bg-gray-700', 'bg-[var(--accent-1)]');
+            pinKnob.style.transform = 'translateX(16px)';
+        } else {
+            pinUI.classList.replace('bg-[var(--accent-1)]', 'bg-gray-700');
+            pinKnob.style.transform = 'translateX(0)';
         }
     }
 
@@ -763,188 +1020,165 @@
         const credSel = document.getElementById('exp-credit-id');
         if(cat === 'Платёж по кредиту') {
             credSel.classList.remove('hidden');
-            const activeCredits = appData.credits.filter(c => c.isActive);
-            if(activeCredits.length === 0) {
-                credSel.innerHTML = `<option value="">Нет активных кредитов</option>`;
-            } else {
-                credSel.innerHTML = activeCredits.map(c => `<option value="${c.id}">${c.name} (Остаток: ${formatMoney(c.remainingAmount)})</option>`).join('');
-            }
+            let opts = `<option value="">Выберите кредит...</option>`;
+            appData.credits.filter(c => c.isActive).forEach(c => opts+=`<option value="${c.id}">Кредит: ${c.name}</option>`);
+            appData.piggyBanks.forEach(p => opts+=`<option value="${p.id}">Копилка: ${p.name}</option>`);
+            credSel.innerHTML = opts || `<option value="">Пусто</option>`;
         } else {
             credSel.classList.add('hidden');
             credSel.value = '';
         }
     }
 
+    function applyTemplate(cat, amount) {
+        document.getElementById('exp-category').value = cat;
+        document.getElementById('exp-amount').value = amount;
+    }
+
+    function mockScanner() {
+        showToast("📷 Имитация камеры...");
+        setTimeout(() => {
+            applyTemplate("Шаурма", 350);
+            document.getElementById('exp-comment').value = "Скан чека";
+            showToast("Чек распознан!");
+        }, 1500);
+    }
+
     function saveExpense() {
         const amount = parseFloat(document.getElementById('exp-amount').value);
-        const category = document.getElementById('exp-category').value;
+        let category = document.getElementById('exp-category').value || 'Без категории';
         const place = document.getElementById('exp-place').value;
         const comment = document.getElementById('exp-comment').value;
-        const creditId = document.getElementById('exp-credit-id').value;
+        const targetId = document.getElementById('exp-credit-id').value;
 
-        if(!amount || amount <= 0) return alert("Введите корректную сумму");
-        if(category === 'Платёж по кредиту' && !creditId) return alert("Выберите кредит для платежа");
+        if(!amount || amount <= 0) return showToast("Введите сумму");
 
-        const tx = {
-            id: generateId(),
-            amount, category, date: new Date().toISOString(),
-            place, comment, isIncome: false, creditId: creditId || null
-        };
-
+        const tx = { id: generateId(), amount, category, date: new Date().toISOString(), place, comment, isIncome: false, targetId };
         appData.transactions.push(tx);
 
-        if(category === 'Платёж по кредиту' && creditId) {
-            const credit = appData.credits.find(c => c.id === creditId);
+        if(category === 'Платёж по кредиту' && targetId) {
+            let credit = appData.credits.find(c => c.id === targetId);
             if(credit) {
                 credit.remainingAmount -= amount;
                 if(credit.remainingAmount <= 0) {
-                    credit.remainingAmount = 0;
-                    credit.isActive = false;
-                    alert(`Поздравляем! Кредит "${credit.name}" полностью погашен!`);
+                    credit.remainingAmount = 0; credit.isActive = false;
+                    showToast(`Долг "${credit.name}" погашен! 🎉`);
+                }
+            } else {
+                let piggy = appData.piggyBanks.find(p => p.id === targetId);
+                if(piggy) {
+                    piggy.current += amount;
+                    if(piggy.current >= piggy.target) showToast(`Цель "${piggy.name}" достигнута! 🥳`);
                 }
             }
         }
 
-        saveLocally();
-        closeModal('modal-add-expense');
-        
-        // Reset form
-        document.getElementById('exp-amount').value = '';
-        document.getElementById('exp-place').value = '';
-        document.getElementById('exp-comment').value = '';
-        
-        renderHome();
-        renderStats();
-        if(category === 'Платёж по кредиту') renderCredits();
+        saveLocally(); closeModal('modal-add-expense');
+        document.getElementById('exp-amount').value = ''; document.getElementById('exp-category').value = '';
+        document.getElementById('exp-place').value = ''; document.getElementById('exp-comment').value = '';
+        renderHome(); renderStats(); renderFinance();
     }
 
     function saveIncome() {
         const amount = parseFloat(document.getElementById('inc-amount').value);
-        const source = document.getElementById('inc-source').value;
-        const comment = document.getElementById('inc-comment').value;
-
-        if(!amount || amount <= 0) return alert("Введите корректную сумму");
-
-        const tx = {
-            id: generateId(),
-            amount, category: source || 'Доход', date: new Date().toISOString(),
-            place: '', comment, isIncome: true, creditId: null
-        };
-
-        appData.transactions.push(tx);
-        saveLocally();
-        closeModal('modal-add-income');
-        
-        document.getElementById('inc-amount').value = '';
-        document.getElementById('inc-source').value = '';
-        document.getElementById('inc-comment').value = '';
-        
-        renderIncomes();
+        if(!amount || amount <= 0) return showToast("Введите сумму");
+        appData.transactions.push({ id: generateId(), amount, category: document.getElementById('inc-source').value || 'Доход', date: new Date().toISOString(), comment: document.getElementById('inc-comment').value, isIncome: true });
+        saveLocally(); closeModal('modal-add-income');
+        ['inc-amount','inc-source','inc-comment'].forEach(id => document.getElementById(id).value = '');
+        renderIncomes(); renderHome();
     }
 
     function saveCredit() {
         const name = document.getElementById('cred-name').value;
         const totalAmount = parseFloat(document.getElementById('cred-total').value);
-        const rate = parseFloat(document.getElementById('cred-rate').value);
-        const term = parseInt(document.getElementById('cred-term').value);
-        const date = document.getElementById('cred-date').value || new Date().toISOString().split('T')[0];
-        const bank = document.getElementById('cred-bank').value;
-        const comment = document.getElementById('cred-comment').value;
+        const rate = parseFloat(document.getElementById('cred-rate').value) || 0;
+        
+        if(!name || !totalAmount) return showToast("Заполните название и сумму");
+        appData.credits.push({ id: generateId(), name, totalAmount, remainingAmount: totalAmount, interestRate: rate, bank: document.getElementById('cred-bank').value, isActive: true });
+        saveLocally(); closeModal('modal-add-credit');
+        renderFinance();
+    }
 
-        if(!name || !totalAmount || isNaN(rate) || !term) return alert("Заполните обязательные поля корректно");
+    function savePiggy() {
+        const name = document.getElementById('piggy-name').value;
+        const target = parseFloat(document.getElementById('piggy-target').value);
+        const current = parseFloat(document.getElementById('piggy-current').value) || 0;
+        if(!name || !target) return showToast("Заполните поля");
+        appData.piggyBanks.push({ id: generateId(), name, target, current });
+        saveLocally(); closeModal('modal-add-piggy'); renderFinance();
+    }
 
-        // Annuity calculation
-        const r = rate / 12 / 100;
-        let monthlyPayment = 0;
-        if(r === 0) {
-            monthlyPayment = totalAmount / term;
-        } else {
-            const factor = Math.pow(1 + r, term);
-            monthlyPayment = totalAmount * (r * factor) / (factor - 1);
-        }
+    function saveBudgetLimit() {
+        const val = parseFloat(document.getElementById('budget-input').value);
+        appData.settings.budgetLimit = val > 0 ? val : null;
+        saveLocally(); showToast("Бюджет сохранён"); renderHome();
+    }
 
-        const credit = {
-            id: generateId(),
-            name, totalAmount, remainingAmount: totalAmount,
-            interestRate: rate, startDate: date, termMonths: term,
-            monthlyPayment, bank, comment, isActive: true
-        };
+    // --- SETTINGS CONTROLS ---
+    function changeCurrency() {
+        appData.settings.currency = document.getElementById('setting-currency').value;
+        document.getElementById('exp-currency-label').innerText = appData.settings.currency;
+        saveLocally(); showToast("Валюта изменена");
+    }
 
-        appData.credits.push(credit);
+    function changeTheme(themeName) {
+        const t = themeName || document.getElementById('setting-theme').value;
+        appData.settings.theme = t;
+        document.body.className = `antialiased h-screen overflow-hidden flex flex-col items-center justify-center theme-${t}`;
         saveLocally();
-        closeModal('modal-add-credit');
-        
-        // reset form
-        ['cred-name','cred-total','cred-rate','cred-term','cred-date','cred-bank','cred-comment'].forEach(id => document.getElementById(id).value = '');
-        
-        renderCredits();
+        if(charts.home) renderHome();
+        if(charts.stats) renderStats();
     }
 
-    function deleteCredit(id) {
-        if(confirm("Удалить кредит? Транзакции останутся.")) {
-            appData.credits = appData.credits.filter(c => c.id !== id);
-            saveLocally();
-            renderCredits();
+    function toggleSetting(key) {
+        if(key === 'pin') {
+            if(appData.settings.pin) {
+                appData.settings.pin = ''; clearPin(); showToast("PIN-код отключен");
+            } else {
+                clearPin(); pinSetupMode = true; navigate('screen-pin'); return;
+            }
         }
+        saveLocally(); renderSettings();
     }
 
-    // --- EXPORT & IMPORT ---
-    function exportLogs() {
-        const content = "SPENDLY LOGS\n" + new Date().toString() + "\n" + JSON.stringify(appData, null, 2);
-        downloadFile('spendly_logs.txt', content, 'text/plain');
-    }
+    function toggleMock(key, msg) { showToast(msg); }
 
+    // --- EXPORT & PDF ---
     function exportData(format) {
         if(format === 'json') {
-            downloadFile('spendly_data.json', JSON.stringify(appData, null, 2), 'application/json');
+            downloadFile('spendly_backup.json', JSON.stringify(appData, null, 2), 'application/json');
         } else if(format === 'csv') {
             let csv = "Дата,Тип,Сумма,Категория,Место,Комментарий\n";
-            appData.transactions.forEach(t => {
-                csv += `${new Date(t.date).toISOString().split('T')[0]},${t.isIncome?'Доход':'Трата'},${t.amount},"${t.category}","${t.place||''}","${t.comment||''}"\n`;
-            });
+            appData.transactions.forEach(t => csv += `${new Date(t.date).toISOString().split('T')[0]},${t.isIncome?'Доход':'Трата'},${t.amount},"${t.category}","${t.place||''}","${t.comment||''}"\n`);
             downloadFile('spendly_transactions.csv', "\uFEFF"+csv, 'text/csv;charset=utf-8');
         }
     }
 
     function downloadFile(filename, text, type) {
-        const blob = new Blob([text], { type: type });
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        a.href = URL.createObjectURL(new Blob([text], { type: type }));
+        a.download = filename; document.body.appendChild(a); a.click(); document.body.removeChild(a);
     }
 
     function importData(event) {
         const file = event.target.files[0];
         if(!file) return;
-
         const reader = new FileReader();
         reader.onload = (e) => {
             try {
-                if(file.name.endsWith('.json')) {
-                    const data = JSON.parse(e.target.result);
-                    if(data.transactions) {
-                        appData.transactions = [...appData.transactions, ...data.transactions];
-                        appData.credits = data.credits ? [...appData.credits, ...data.credits] : appData.credits;
-                        saveLocally();
-                        alert("Данные успешно импортированы!");
-                        initMainInterface();
-                    }
-                } else {
-                    alert("Поддержка CSV импорта в разработке. Используйте JSON.");
-                }
-            } catch(err) {
-                alert("Ошибка чтения файла. Проверьте формат.");
-            }
+                const data = JSON.parse(e.target.result);
+                appData = { ...appData, ...data }; saveLocally();
+                showToast("Данные успешно восстановлены!"); setTimeout(() => window.location.reload(), 1000);
+            } catch(err) { showToast("Ошибка чтения файла JSON"); }
         };
         reader.readAsText(file);
     }
 
-    // Boot
-    window.onload = initApp;
-
+    function exportToPDF() {
+        const element = document.getElementById('view-stats');
+        const opt = { margin: 1, filename: 'spendly_report.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
+        html2pdf().set(opt).from(element).save();
+    }
 </script>
 </body>
 </html>
